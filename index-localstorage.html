@@ -16,9 +16,6 @@
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- Supabase -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    
     <!-- React -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -33,6 +30,7 @@
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
         }
         
+        /* Animazioni personalizzate */
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
@@ -41,20 +39,6 @@
         .animate-fade-in {
             animation: fadeIn 0.5s ease-out;
         }
-
-        .config-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: linear-gradient(135deg, #0f172a 0%, #064e3b 100%);
-            z-index: 9999;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-        }
     </style>
 </head>
 <body>
@@ -62,18 +46,9 @@
 
     <script type="text/babel">
         const { useState, useEffect } = React;
-        const { Car, Zap, TrendingDown, Plus, Settings, BarChart3, Euro, Calendar, Database, RefreshCw } = lucide;
-
-        // CONFIGURAZIONE SUPABASE
-        // Sostituisci questi valori con i tuoi dopo aver creato il progetto Supabase
-        const SUPABASE_URL = 'YOUR_SUPABASE_URL';
-        const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
+        const { Car, Zap, TrendingDown, Plus, Settings, BarChart3, Euro, Calendar, Fuel } = lucide;
 
         const EVCostTracker = () => {
-          const [supabase, setSupabase] = useState(null);
-          const [showConfig, setShowConfig] = useState(false);
-          const [configUrl, setConfigUrl] = useState('');
-          const [configKey, setConfigKey] = useState('');
           const [charges, setCharges] = useState([]);
           const [suppliers, setSuppliers] = useState([]);
           const [settings, setSettings] = useState({
@@ -87,7 +62,6 @@
           const [showAddCharge, setShowAddCharge] = useState(false);
           const [showAddSupplier, setShowAddSupplier] = useState(false);
           const [isLoading, setIsLoading] = useState(true);
-          const [isSyncing, setIsSyncing] = useState(false);
 
           const [newCharge, setNewCharge] = useState({
             date: new Date().toISOString().slice(0, 16),
@@ -103,170 +77,84 @@
             standardCost: ''
           });
 
-          // Inizializza Supabase
           useEffect(() => {
-            // Controlla se c'è una configurazione salvata
-            const savedUrl = localStorage.getItem('supabase_url');
-            const savedKey = localStorage.getItem('supabase_key');
-
-            if (savedUrl && savedKey && savedUrl !== 'YOUR_SUPABASE_URL') {
-              initSupabase(savedUrl, savedKey);
-            } else if (SUPABASE_URL !== 'YOUR_SUPABASE_URL') {
-              initSupabase(SUPABASE_URL, SUPABASE_ANON_KEY);
-            } else {
-              setShowConfig(true);
-              setIsLoading(false);
-            }
+            loadData();
           }, []);
 
-          const initSupabase = (url, key) => {
-            try {
-              const client = supabase.createClient(url, key);
-              setSupabase(client);
-              localStorage.setItem('supabase_url', url);
-              localStorage.setItem('supabase_key', key);
-              setShowConfig(false);
-            } catch (error) {
-              console.error('Errore inizializzazione Supabase:', error);
-              alert('Errore nella configurazione. Controlla URL e Key.');
-            }
-          };
-
-          const saveConfig = () => {
-            if (!configUrl || !configKey) {
-              alert('Inserisci sia URL che Anon Key');
-              return;
-            }
-            initSupabase(configUrl, configKey);
-            loadData();
-          };
-
-          // Carica dati quando Supabase è pronto
-          useEffect(() => {
-            if (supabase) {
-              loadData();
-            }
-          }, [supabase]);
-
-          const loadData = async () => {
-            if (!supabase) return;
-            
+          const loadData = () => {
             setIsLoading(true);
-            setIsSyncing(true);
-            
             try {
-              // Carica ricariche
-              const { data: chargesData, error: chargesError } = await supabase
-                .from('charges')
-                .select('*')
-                .order('date', { ascending: false });
+              // Carica ricariche da localStorage
+              const chargesData = localStorage.getItem('ev_charges');
+              if (chargesData) {
+                const loadedCharges = JSON.parse(chargesData);
+                setCharges(loadedCharges.sort((a, b) => 
+                  new Date(b.date) - new Date(a.date)
+                ));
+              }
 
-              if (chargesError) {
-                console.error('Errore caricamento ricariche:', chargesError);
-                if (chargesError.code === '42P01') {
-                  alert('Tabelle non trovate! Esegui lo script SQL fornito in Supabase.');
-                }
+              // Carica fornitori da localStorage
+              const suppliersData = localStorage.getItem('ev_suppliers');
+              if (suppliersData) {
+                setSuppliers(JSON.parse(suppliersData));
               } else {
-                setCharges(chargesData || []);
+                // Aggiungi fornitore Casa di default
+                const homeSupplier = {
+                  id: 'home',
+                  name: 'Casa',
+                  type: 'AC',
+                  standardCost: 0
+                };
+                const defaultSuppliers = [homeSupplier];
+                localStorage.setItem('ev_suppliers', JSON.stringify(defaultSuppliers));
+                setSuppliers(defaultSuppliers);
               }
 
-              // Carica fornitori
-              const { data: suppliersData, error: suppliersError } = await supabase
-                .from('suppliers')
-                .select('*');
-
-              if (suppliersError) {
-                console.error('Errore caricamento fornitori:', suppliersError);
-              } else if (suppliersData && suppliersData.length > 0) {
-                setSuppliers(suppliersData);
+              // Carica impostazioni da localStorage
+              const settingsData = localStorage.getItem('ev_settings');
+              if (settingsData) {
+                setSettings(JSON.parse(settingsData));
               } else {
-                // Crea fornitore Casa di default
-                const { data: homeSupplier } = await supabase
-                  .from('suppliers')
-                  .insert([{
-                    name: 'Casa',
-                    type: 'AC',
-                    standard_cost: 0
-                  }])
-                  .select()
-                  .single();
-                
-                if (homeSupplier) {
-                  setSuppliers([homeSupplier]);
-                }
+                localStorage.setItem('ev_settings', JSON.stringify(settings));
               }
-
-              // Carica impostazioni
-              const { data: settingsData, error: settingsError } = await supabase
-                .from('settings')
-                .select('*')
-                .single();
-
-              if (settingsError) {
-                // Crea impostazioni di default
-                await supabase
-                  .from('settings')
-                  .insert([{
-                    gasoline_price: 1.85,
-                    diesel_price: 1.70,
-                    home_electricity_price: 0.25,
-                    gasoline_consumption: 15,
-                    diesel_consumption: 18
-                  }]);
-              } else if (settingsData) {
-                setSettings({
-                  gasolinePrice: settingsData.gasoline_price,
-                  dieselPrice: settingsData.diesel_price,
-                  homeElectricityPrice: settingsData.home_electricity_price,
-                  gasolineConsumption: settingsData.gasoline_consumption,
-                  dieselConsumption: settingsData.diesel_consumption
-                });
-              }
-
             } catch (error) {
               console.error('Errore caricamento dati:', error);
             }
-            
             setIsLoading(false);
-            setIsSyncing(false);
           };
 
-          const saveCharge = async () => {
+          const saveCharge = () => {
             if (!newCharge.totalKm || !newCharge.kWhAdded || !newCharge.supplier) {
               alert('Compila tutti i campi obbligatori');
               return;
             }
 
-            setIsSyncing(true);
-            const supplier = suppliers.find(s => s.id === parseInt(newCharge.supplier));
+            const supplier = suppliers.find(s => s.id === newCharge.supplier);
             let finalCost = parseFloat(newCharge.cost) || 0;
 
             if (supplier.name === 'Casa') {
               finalCost = parseFloat(newCharge.kWhAdded) * settings.homeElectricityPrice;
             }
 
+            const charge = {
+              id: Date.now().toString(),
+              date: newCharge.date,
+              totalKm: parseFloat(newCharge.totalKm),
+              kWhAdded: parseFloat(newCharge.kWhAdded),
+              supplier: newCharge.supplier,
+              supplierName: supplier.name,
+              supplierType: supplier.type,
+              cost: finalCost,
+              savedGasolinePrice: settings.gasolinePrice,
+              savedDieselPrice: settings.dieselPrice,
+              savedGasolineConsumption: settings.gasolineConsumption,
+              savedDieselConsumption: settings.dieselConsumption
+            };
+
             try {
-              const { data, error } = await supabase
-                .from('charges')
-                .insert([{
-                  date: newCharge.date,
-                  total_km: parseFloat(newCharge.totalKm),
-                  kwh_added: parseFloat(newCharge.kWhAdded),
-                  supplier_id: parseInt(newCharge.supplier),
-                  supplier_name: supplier.name,
-                  supplier_type: supplier.type,
-                  cost: finalCost,
-                  saved_gasoline_price: settings.gasolinePrice,
-                  saved_diesel_price: settings.dieselPrice,
-                  saved_gasoline_consumption: settings.gasolineConsumption,
-                  saved_diesel_consumption: settings.dieselConsumption
-                }])
-                .select()
-                .single();
-
-              if (error) throw error;
-
-              setCharges(prev => [data, ...prev]);
+              const updatedCharges = [charge, ...charges];
+              localStorage.setItem('ev_charges', JSON.stringify(updatedCharges));
+              setCharges(updatedCharges);
               setNewCharge({
                 date: new Date().toISOString().slice(0, 16),
                 totalKm: '',
@@ -277,128 +165,94 @@
               setShowAddCharge(false);
             } catch (error) {
               console.error('Errore salvataggio ricarica:', error);
-              alert('Errore nel salvataggio: ' + error.message);
+              alert('Errore nel salvataggio. Riprova.');
             }
-            setIsSyncing(false);
           };
 
-          const saveSupplier = async () => {
+          const saveSupplier = () => {
             if (!newSupplier.name || !newSupplier.standardCost) {
               alert('Compila tutti i campi');
               return;
             }
 
-            setIsSyncing(true);
+            const supplier = {
+              id: Date.now().toString(),
+              name: newSupplier.name,
+              type: newSupplier.type,
+              standardCost: parseFloat(newSupplier.standardCost)
+            };
+
             try {
-              const { data, error } = await supabase
-                .from('suppliers')
-                .insert([{
-                  name: newSupplier.name,
-                  type: newSupplier.type,
-                  standard_cost: parseFloat(newSupplier.standardCost)
-                }])
-                .select()
-                .single();
-
-              if (error) throw error;
-
-              setSuppliers(prev => [...prev, data]);
+              const updatedSuppliers = [...suppliers, supplier];
+              localStorage.setItem('ev_suppliers', JSON.stringify(updatedSuppliers));
+              setSuppliers(updatedSuppliers);
               setNewSupplier({ name: '', type: 'AC', standardCost: '' });
               setShowAddSupplier(false);
             } catch (error) {
               console.error('Errore salvataggio fornitore:', error);
-              alert('Errore nel salvataggio: ' + error.message);
+              alert('Errore nel salvataggio. Riprova.');
             }
-            setIsSyncing(false);
           };
 
-          const saveSettings = async () => {
-            setIsSyncing(true);
+          const saveSettings = () => {
             try {
-              const { error } = await supabase
-                .from('settings')
-                .update({
-                  gasoline_price: settings.gasolinePrice,
-                  diesel_price: settings.dieselPrice,
-                  home_electricity_price: settings.homeElectricityPrice,
-                  gasoline_consumption: settings.gasolineConsumption,
-                  diesel_consumption: settings.dieselConsumption
-                })
-                .eq('id', 1);
-
-              if (error) throw error;
+              localStorage.setItem('ev_settings', JSON.stringify(settings));
               alert('Impostazioni salvate!');
             } catch (error) {
               console.error('Errore salvataggio impostazioni:', error);
-              alert('Errore nel salvataggio: ' + error.message);
+              alert('Errore nel salvataggio. Riprova.');
             }
-            setIsSyncing(false);
           };
 
-          const deleteCharge = async (id) => {
+          const deleteCharge = (id) => {
             if (!confirm('Sei sicuro di voler eliminare questa ricarica?')) return;
             
-            setIsSyncing(true);
             try {
-              const { error } = await supabase
-                .from('charges')
-                .delete()
-                .eq('id', id);
-
-              if (error) throw error;
-              setCharges(prev => prev.filter(c => c.id !== id));
+              const updatedCharges = charges.filter(c => c.id !== id);
+              localStorage.setItem('ev_charges', JSON.stringify(updatedCharges));
+              setCharges(updatedCharges);
             } catch (error) {
               console.error('Errore eliminazione ricarica:', error);
-              alert('Errore nell\'eliminazione: ' + error.message);
             }
-            setIsSyncing(false);
           };
 
-          const deleteSupplier = async (id) => {
-            const supplier = suppliers.find(s => s.id === id);
-            if (supplier && supplier.name === 'Casa') {
+          const deleteSupplier = (id) => {
+            if (id === 'home') {
               alert('Non puoi eliminare il fornitore "Casa"');
               return;
             }
             if (!confirm('Sei sicuro di voler eliminare questo fornitore?')) return;
             
-            setIsSyncing(true);
             try {
-              const { error } = await supabase
-                .from('suppliers')
-                .delete()
-                .eq('id', id);
-
-              if (error) throw error;
-              setSuppliers(prev => prev.filter(s => s.id !== id));
+              const updatedSuppliers = suppliers.filter(s => s.id !== id);
+              localStorage.setItem('ev_suppliers', JSON.stringify(updatedSuppliers));
+              setSuppliers(updatedSuppliers);
             } catch (error) {
               console.error('Errore eliminazione fornitore:', error);
-              alert('Errore nell\'eliminazione: ' + error.message);
             }
-            setIsSyncing(false);
           };
 
           const calculateStats = () => {
             if (charges.length === 0) return null;
 
-            const totalKwh = charges.reduce((sum, c) => sum + parseFloat(c.kwh_added || 0), 0);
-            const totalCost = charges.reduce((sum, c) => sum + parseFloat(c.cost || 0), 0);
+            const totalKwh = charges.reduce((sum, c) => sum + c.kWhAdded, 0);
+            const totalCost = charges.reduce((sum, c) => sum + c.cost, 0);
             const avgCostPerKwh = totalCost / totalKwh;
 
-            const sortedByKm = [...charges].sort((a, b) => parseFloat(a.total_km) - parseFloat(b.total_km));
-            const kmDriven = parseFloat(sortedByKm[sortedByKm.length - 1].total_km) - parseFloat(sortedByKm[0].total_km);
+            const sortedByKm = [...charges].sort((a, b) => a.totalKm - b.totalKm);
+            const kmDriven = sortedByKm[sortedByKm.length - 1].totalKm - sortedByKm[0].totalKm;
             const consumption = kmDriven > 0 ? (totalKwh / kmDriven) * 100 : 0;
 
             let gasolineCost = 0;
             let dieselCost = 0;
 
             charges.forEach(charge => {
-              const gasPrice = charge.saved_gasoline_price || settings.gasolinePrice;
-              const diesPrice = charge.saved_diesel_price || settings.dieselPrice;
-              const gasCons = charge.saved_gasoline_consumption || settings.gasolineConsumption;
-              const diesCons = charge.saved_diesel_consumption || settings.dieselConsumption;
+              const gasPrice = charge.savedGasolinePrice || settings.gasolinePrice;
+              const diesPrice = charge.savedDieselPrice || settings.dieselPrice;
+              const gasCons = charge.savedGasolineConsumption || settings.gasolineConsumption;
+              const diesCons = charge.savedDieselConsumption || settings.dieselConsumption;
               
-              const estimatedKmForCharge = parseFloat(charge.kwh_added) / (consumption / 100);
+              const estimatedKmForCharge = charge.kWhAdded / (consumption / 100);
               gasolineCost += (estimatedKmForCharge / gasCons) * gasPrice;
               dieselCost += (estimatedKmForCharge / diesCons) * diesPrice;
             });
@@ -420,67 +274,11 @@
 
           const stats = calculateStats();
 
-          // Schermata di configurazione
-          if (showConfig) {
-            return (
-              <div className="config-overlay">
-                <div className="bg-slate-800 rounded-2xl p-8 max-w-lg w-full border border-emerald-500/30 shadow-2xl">
-                  <div className="flex items-center gap-3 mb-6">
-                    <Database className="w-8 h-8 text-emerald-400" />
-                    <h1 className="text-2xl font-bold text-emerald-400">Configurazione Supabase</h1>
-                  </div>
-                  
-                  <p className="text-slate-300 mb-6">
-                    Per utilizzare l'app, devi configurare il database Supabase. Segui la guida SUPABASE_SETUP.md per ottenere questi valori.
-                  </p>
-
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm text-slate-300 mb-2">Supabase URL</label>
-                      <input
-                        type="text"
-                        value={configUrl}
-                        onChange={(e) => setConfigUrl(e.target.value)}
-                        placeholder="https://xxx.supabase.co"
-                        className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-2 text-white focus:border-emerald-500 focus:outline-none font-mono text-sm"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm text-slate-300 mb-2">Supabase Anon Key</label>
-                      <input
-                        type="text"
-                        value={configKey}
-                        onChange={(e) => setConfigKey(e.target.value)}
-                        placeholder="eyJhbG..."
-                        className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-2 text-white focus:border-emerald-500 focus:outline-none font-mono text-sm"
-                      />
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={saveConfig}
-                    className="w-full mt-6 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-600 hover:to-cyan-600 text-slate-900 px-6 py-3 rounded-xl font-bold transition-all"
-                  >
-                    Salva Configurazione
-                  </button>
-
-                  <p className="text-xs text-slate-400 mt-4 text-center">
-                    I valori verranno salvati nel browser
-                  </p>
-                </div>
-              </div>
-            );
-          }
-
           if (isLoading) {
             return (
               <div className="min-h-screen bg-gradient-to-br from-slate-950 via-emerald-950 to-slate-900 flex items-center justify-center">
-                <div className="text-center">
-                  <RefreshCw className="w-12 h-12 text-emerald-400 animate-spin mx-auto mb-4" />
-                  <div className="text-emerald-400 text-2xl font-bold">
-                    Caricamento...
-                  </div>
+                <div className="text-emerald-400 text-2xl font-bold animate-pulse">
+                  Caricamento...
                 </div>
               </div>
             );
@@ -497,9 +295,6 @@
                     <h1 className="text-2xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
                       EV Cost Tracker
                     </h1>
-                    {isSyncing && (
-                      <RefreshCw className="w-4 h-4 text-emerald-400 animate-spin" />
-                    )}
                   </div>
                   <div className="flex gap-2">
                     <button
@@ -521,13 +316,6 @@
                       }`}
                     >
                       <Settings className="w-5 h-5" />
-                    </button>
-                    <button
-                      onClick={loadData}
-                      className="px-4 py-2 rounded-lg bg-slate-800/50 hover:bg-slate-700/50 transition-all"
-                      title="Ricarica dati"
-                    >
-                      <RefreshCw className="w-5 h-5" />
                     </button>
                   </div>
                 </div>
@@ -589,7 +377,7 @@
 
                     {showAddCharge && (
                       <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                        <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl p-6 max-w-md w-full border border-emerald-500/30 shadow-2xl max-h-[90vh] overflow-y-auto">
+                        <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl p-6 max-w-md w-full border border-emerald-500/30 shadow-2xl">
                           <h2 className="text-2xl font-bold mb-6 text-emerald-400">Nuova Ricarica</h2>
                           
                           <div className="space-y-4">
@@ -642,7 +430,7 @@
                               </select>
                             </div>
 
-                            {newCharge.supplier && suppliers.find(s => s.id === parseInt(newCharge.supplier))?.name !== 'Casa' && (
+                            {newCharge.supplier && suppliers.find(s => s.id === newCharge.supplier)?.name !== 'Casa' && (
                               <div>
                                 <label className="block text-sm text-slate-300 mb-2">Costo (€)</label>
                                 <input
@@ -656,7 +444,7 @@
                               </div>
                             )}
 
-                            {newCharge.supplier && suppliers.find(s => s.id === parseInt(newCharge.supplier))?.name === 'Casa' && (
+                            {newCharge.supplier && suppliers.find(s => s.id === newCharge.supplier)?.name === 'Casa' && (
                               <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-3">
                                 <p className="text-sm text-emerald-400">
                                   Il costo verrà calcolato automaticamente: {newCharge.kWhAdded ? `€${(parseFloat(newCharge.kWhAdded) * settings.homeElectricityPrice).toFixed(2)}` : '€0.00'}
@@ -674,10 +462,9 @@
                             </button>
                             <button
                               onClick={saveCharge}
-                              disabled={isSyncing}
-                              className="flex-1 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-600 hover:to-cyan-600 text-slate-900 px-4 py-2 rounded-lg font-bold transition-all disabled:opacity-50"
+                              className="flex-1 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-600 hover:to-cyan-600 text-slate-900 px-4 py-2 rounded-lg font-bold transition-all"
                             >
-                              {isSyncing ? 'Salvataggio...' : 'Salva'}
+                              Salva
                             </button>
                           </div>
                         </div>
@@ -711,14 +498,13 @@
                                     </span>
                                   </div>
                                   <div className="flex items-center gap-4 text-sm">
-                                    <span className="text-emerald-400 font-semibold">{charge.supplier_name}</span>
-                                    <span className="text-slate-400">({charge.supplier_type})</span>
+                                    <span className="text-emerald-400 font-semibold">{charge.supplierName}</span>
+                                    <span className="text-slate-400">({charge.supplierType})</span>
                                   </div>
                                 </div>
                                 <button
                                   onClick={() => deleteCharge(charge.id)}
-                                  disabled={isSyncing}
-                                  className="text-red-400 hover:text-red-300 text-sm disabled:opacity-50"
+                                  className="text-red-400 hover:text-red-300 text-sm"
                                 >
                                   Elimina
                                 </button>
@@ -726,19 +512,19 @@
                               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-3 text-sm">
                                 <div>
                                   <span className="text-slate-400">Km totali:</span>
-                                  <span className="ml-2 text-white font-semibold">{parseFloat(charge.total_km).toLocaleString()}</span>
+                                  <span className="ml-2 text-white font-semibold">{charge.totalKm.toLocaleString()}</span>
                                 </div>
                                 <div>
                                   <span className="text-slate-400">kWh:</span>
-                                  <span className="ml-2 text-cyan-400 font-semibold">{charge.kwh_added}</span>
+                                  <span className="ml-2 text-cyan-400 font-semibold">{charge.kWhAdded}</span>
                                 </div>
                                 <div>
                                   <span className="text-slate-400">Costo:</span>
-                                  <span className="ml-2 text-emerald-400 font-semibold">€{parseFloat(charge.cost).toFixed(2)}</span>
+                                  <span className="ml-2 text-emerald-400 font-semibold">€{charge.cost.toFixed(2)}</span>
                                 </div>
                                 <div>
                                   <span className="text-slate-400">€/kWh:</span>
-                                  <span className="ml-2 text-white font-semibold">{(parseFloat(charge.cost) / parseFloat(charge.kwh_added)).toFixed(3)}</span>
+                                  <span className="ml-2 text-white font-semibold">{(charge.cost / charge.kWhAdded).toFixed(3)}</span>
                                 </div>
                               </div>
                             </div>
@@ -832,10 +618,9 @@
 
                         <button
                           onClick={saveSettings}
-                          disabled={isSyncing}
-                          className="w-full md:w-auto bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-600 hover:to-cyan-600 text-slate-900 px-6 py-3 rounded-xl font-bold transition-all disabled:opacity-50"
+                          className="w-full md:w-auto bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-600 hover:to-cyan-600 text-slate-900 px-6 py-3 rounded-xl font-bold transition-all"
                         >
-                          {isSyncing ? 'Salvataggio...' : 'Salva Impostazioni'}
+                          Salva Impostazioni
                         </button>
                       </div>
                     </div>
@@ -860,15 +645,14 @@
                               <div className="flex gap-4 mt-1 text-sm text-slate-400">
                                 <span>Tipo: {supplier.type}</span>
                                 {supplier.name !== 'Casa' && (
-                                  <span>€{supplier.standard_cost}/kWh</span>
+                                  <span>€{supplier.standardCost}/kWh</span>
                                 )}
                               </div>
                             </div>
-                            {supplier.name !== 'Casa' && (
+                            {supplier.id !== 'home' && (
                               <button
                                 onClick={() => deleteSupplier(supplier.id)}
-                                disabled={isSyncing}
-                                className="text-red-400 hover:text-red-300 text-sm disabled:opacity-50"
+                                className="text-red-400 hover:text-red-300 text-sm"
                               >
                                 Elimina
                               </button>
@@ -929,35 +713,20 @@
                             </button>
                             <button
                               onClick={saveSupplier}
-                              disabled={isSyncing}
-                              className="flex-1 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-600 hover:to-cyan-600 text-slate-900 px-4 py-2 rounded-lg font-bold transition-all disabled:opacity-50"
+                              className="flex-1 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-600 hover:to-cyan-600 text-slate-900 px-4 py-2 rounded-lg font-bold transition-all"
                             >
-                              {isSyncing ? 'Salvataggio...' : 'Salva'}
+                              Salva
                             </button>
                           </div>
                         </div>
                       </div>
                     )}
-
-                    <div className="bg-slate-800/50 backdrop-blur rounded-2xl border border-slate-700/50 p-6">
-                      <h2 className="text-xl font-bold text-emerald-400 mb-4">Configurazione Database</h2>
-                      <button
-                        onClick={() => {
-                          localStorage.removeItem('supabase_url');
-                          localStorage.removeItem('supabase_key');
-                          setShowConfig(true);
-                        }}
-                        className="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg transition-all"
-                      >
-                        Riconfigura Supabase
-                      </button>
-                    </div>
                   </div>
                 )}
               </main>
 
               <footer className="mt-12 py-6 text-center text-slate-500 text-sm">
-                <p>EV Cost Tracker - Dati sincronizzati nel cloud con Supabase</p>
+                <p>EV Cost Tracker - I tuoi dati sono salvati localmente sul dispositivo</p>
               </footer>
             </div>
           );

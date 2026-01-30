@@ -87,7 +87,9 @@ Dopo il deployment, apri l'URL sul telefono:
 → Aspetta 2-3 minuti dopo il deployment
 
 **"Non vedo i miei dati su altri dispositivi"**
-→ Assicurati di usare lo stesso URL su tutti i dispositivi
+→ I dati sono salvati localmente su ogni browser/dispositivo
+→ Ogni dispositivo mantiene i propri dati separati
+→ Puoi esportare/importare manualmente (vedi README.md)
 
 **"Voglio cambiare l'URL"**
 → Su Netlify: Site settings > Change site name

@@ -8,13 +8,19 @@ App web per tracciare i costi della tua auto elettrica e calcolare il risparmio 
 - 🏪 Gestione fornitori personalizzabili (AC/DC)
 - 💰 Calcolo automatico risparmio vs benzina/diesel
 - 📊 Dashboard con statistiche dettagliate
-- ☁️ Sincronizzazione cloud multi-dispositivo
+- ☁️ **Sincronizzazione cloud automatica con Supabase**
+- 🔄 **Multi-dispositivo**: PC, Mac, iPhone, iPad, Android
 - 📱 Responsive design (mobile, tablet, desktop)
 - 🔒 Dati storici protetti dalle modifiche dei prezzi
+- 💾 Backup automatico nel cloud
 
 ## 🚀 Deployment
 
-### Opzione 1: GitHub Pages (CONSIGLIATA)
+### ⚠️ IMPORTANTE: Prima di fare il deployment
+
+L'app richiede un database Supabase (gratuito). **Segui prima la guida SUPABASE_SETUP.md** (5 minuti), poi procedi con il deployment.
+
+### Opzione 1: Netlify (CONSIGLIATA)
 
 #### Passaggi:
 
@@ -123,20 +129,29 @@ Una volta caricata online, puoi installarla come app nativa:
 
 ```
 ev-cost-tracker/
-├── index.html          # App principale
-├── manifest.json       # Configurazione PWA
-└── README.md          # Questo file
+├── index.html              # App principale con Supabase
+├── index-localstorage.html # Versione alternativa con localStorage (senza sync)
+├── manifest.json           # Configurazione PWA
+├── database-schema.sql     # Script SQL per creare le tabelle
+├── SUPABASE_SETUP.md      # Guida setup Supabase (LEGGI PRIMA!)
+├── DEPLOYMENT.md          # Guida deployment
+└── README.md              # Questo file
 ```
 
 ---
 
 ## 💾 Archiviazione Dati
 
-L'app usa il sistema di **persistent storage** di Claude, che:
-- Salva i dati nel cloud
-- Sincronizza automaticamente tra dispositivi
-- Non richiede login o autenticazione
-- È completamente gratuito
+L'app usa **Supabase** (PostgreSQL nel cloud), che:
+- ☁️ Salva i dati nel cloud sicuro
+- 🔄 Sincronizza automaticamente tra TUTTI i dispositivi
+- 📱 PC ↔️ iPhone ↔️ iPad ↔️ Android - tutto sincronizzato!
+- 💾 Backup automatici
+- 🆓 Completamente gratuito (piano Free di Supabase)
+- 🔒 Sicuro e criptato
+- 📊 Puoi visualizzare/esportare i dati dalla dashboard Supabase
+
+**Setup**: Segui la guida `SUPABASE_SETUP.md` (5 minuti)
 
 ---
 
@@ -171,17 +186,27 @@ Vai in **Impostazioni** (icona ingranaggio) per modificare questi valori.
 
 ## 🆘 Risoluzione Problemi
 
-**L'app non salva i dati:**
-- Assicurati di essere online
-- Controlla che il browser non blocchi i cookie/storage
+**"L'app mostra schermata di configurazione"**
+- Devi configurare Supabase (vedi SUPABASE_SETUP.md)
+- Oppure i valori URL/Key sono errati
 
-**Non vedo le statistiche:**
+**"Tabelle non trovate"**
+- Hai dimenticato di eseguire lo script database-schema.sql
+- Vai in Supabase > SQL Editor > esegui lo script
+
+**"I dati non si sincronizzano"**
+- Controlla la connessione internet
+- Verifica che Supabase sia configurato correttamente
+- Apri la console del browser (F12) per vedere eventuali errori
+
+**"Non vedo le statistiche"**
 - Aggiungi almeno 2 ricariche con km diversi
 - Le statistiche si basano sui dati storici
 
-**Voglio resettare tutto:**
-- Apri la console del browser (F12)
-- Esegui: `window.storage.list().then(r => r.keys.forEach(k => window.storage.delete(k)))`
+**"Voglio resettare tutto"**
+- Vai in Supabase > Table Editor
+- Elimina i dati dalle tabelle charges e suppliers
+- Oppure usa SQL: `DELETE FROM charges; DELETE FROM suppliers WHERE name != 'Casa';`
 
 ---
 
